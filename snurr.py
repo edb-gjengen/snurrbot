@@ -188,7 +188,7 @@ class IRCActions():
         reply = "URL: "
         url = urlmatch.group()
         try:
-            i = urllib2.urlopen(url, timeout=1)
+            i = urllib2.urlopen(url, timeout=3)
         except:
             self.bot.msgReply(nick, channel, reply + "Timeout")
             return
