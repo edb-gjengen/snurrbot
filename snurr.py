@@ -7,12 +7,16 @@ import MySQLdb
 import urllib2, lxml.html, re
 from datetime import datetime
 
+
 from twisted.words.protocols import irc
 from twisted.internet import protocol, reactor, ssl
 from twisted.enterprise import adbapi
 from twisted.python import log
 
 import settings
+
+if not settings.DISABLE_LOG:
+    import MySQLdb
 
 class SnurrBot(irc.IRCClient):
     def __init__(self):
@@ -98,13 +102,23 @@ class UDPListener(protocol.DatagramProtocol):
 class IRCActions():
     def __init__(self, bot):
         self.bot = bot
-        self.dbpool = self._get_dbpool()
+        if not settings.DISABLE_LOG:
+            self.dbpool = self._get_dbpool()
+            self.tetris_dbpool = self._get_tetris_dbpool()
 
     def _get_dbpool(self):
         # Setup an async db connection
         return ReconnectingConnectionPool(settings.DB_API_ADAPTER,
             host=settings.DB_HOST, user=settings.DB_USER,
             passwd=settings.DB_PASSWORD, db=settings.DB_NAME,
+            charset="utf8", use_unicode=True,
+            cp_reconnect=True)
+
+    def _get_tetris_dbpool(self):
+        # Setup an async db connection
+        return ReconnectingConnectionPool(settings.DB_API_ADAPTER,
+            host=settings.TETRIS_DB_HOST, user=settings.TETRIS_DB_USER,
+            passwd=settings.TETRIS_DB_PASSWORD, db=settings.TETRIS_DB_NAME,
             charset="utf8", use_unicode=True,
             cp_reconnect=True)
 
@@ -127,10 +141,11 @@ class IRCActions():
         text = ""
         text += "Command: !help\n"
         text += "   This help message\n"
-        text += "Command: !log DESCRIPTION\n"
-        text += "   Add new entry in log\n"
-        text += "Command: !lastlog\n"
-        text += "   Last 3 log entries\n"
+        if not settings.DISABLE_LOG:
+            text += "Command: !log DESCRIPTION\n"
+            text += "   Add new entry in log\n"
+            text += "Command: !lastlog\n"
+            text += "   Last 3 log entries\n"
         text += "Command: !ping HOST\n"
         text += "   Ping target host"
         return text
@@ -148,13 +163,16 @@ class IRCActions():
             self.bot.msgReply(nick, channel, self.ping(parts[1]))
         elif parts[0] == "help" and len(parts) == 1:
             self.bot.msgReply(nick, channel, self.help())
-        elif parts[0] == "log" and len(parts) >= 2:
+        elif parts[0] == "log" and len(parts) >= 2 and not settings.DISABLE_LOG:
             # set_log_entry should create a deferred and
             # the callback should fire when the db returns.
             self.set_log_entry(nick, parts[1:]).addCallback(self.msg_log_entry, channel, nick)
-        elif parts[0] == "lastlog" and len(parts) == 1:
+        elif parts[0] == "lastlog" and len(parts) == 1 and not settings.DISABLE_LOG:
             # ...same as above
             self.get_lastlog().addCallback(self.msg_lastlog, channel, nick)
+        elif parts[0] == "tetrishigh" and len(parts) == 1 and not settings.DISABLE_TETRIS:
+            self.get_tetris_highscore().addCallback(self.msg_tetris_highscore, channel, nick)
+
         else:
             self.bot.msgReply(nick, channel, "Need !help " + nick + "?")
 
@@ -214,6 +232,16 @@ class IRCActions():
         for i,entry in enumerate(log_entries, start=1):
             string_entry = str(i) + ": " + entry[2] + " (" + entry[1] + ", " + str(entry[3]) + ")"
             self.bot.msgReply(nick, channel, string_entry.encode("utf-8"))
+
+    def get_tetris_highscore(self):
+        sql = "SELECT MAX(score) AS highscore, name FROM highscore GROUP BY name ORDER BY highscore DESC LIMIT 3"
+        return self.tetris_dbpool.runQuery(sql)
+
+    def msg_tetris_highscore(self, highscores, channel, nick):
+        for highscore in highscores:
+            high,name = highscore
+            string_highscore = "Highscore: " + str(high) + " by " + name + "."
+            self.bot.msgReply(nick, channel, string_highscore.encode("utf-8"))
 
 class ReconnectingConnectionPool(adbapi.ConnectionPool):
     """Reconnecting adbapi connection pool for MySQL.
