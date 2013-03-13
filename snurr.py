@@ -4,6 +4,7 @@ import optparse
 import subprocess 
 import time
 import MySQLdb
+import urllib2, lxml.html, re
 from datetime import datetime
 
 from twisted.words.protocols import irc
@@ -39,6 +40,8 @@ class SnurrBot(irc.IRCClient):
         # Handle command strings.
         if msg.startswith("!"):
             self.actions.new(msg[1:], user, channel)
+        else:
+            self.actions.newfull(msg, user, channel)
         _log("PRIVMSG: %s: %s" % (user,msg,))
     
     def msgReply(self, user, to, msg):
@@ -154,6 +157,45 @@ class IRCActions():
             self.get_lastlog().addCallback(self.msg_lastlog, channel, nick)
         else:
             self.bot.msgReply(nick, channel, "Need !help " + nick + "?")
+
+    def newfull(self, msg, user, channel):
+        nick = user.split('!', 1)[0] # Strip out hostmask
+
+        # Check if msg contains HTTP(S) URL
+        urlmatch = re.search(r"(https?):\/\/([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.-]*\/?)(\?[\/\w=&\.-]+)?", msg, re.I)
+        if urlmatch is not None:
+            self.msg_urlinfo(urlmatch, channel, nick)
+
+    def msg_urlinfo(self, urlmatch, channel, nick):
+        reply = "URL: "
+        url = urlmatch.group()
+        try:
+            i = urllib2.urlopen(url, timeout=1)
+        except:
+            self.bot.msgReply(nick, channel, reply + "Timeout")
+            return
+        statuscode = i.getcode()
+        contenttype = i.info().gettype()
+        reply += "%d %s " % (statuscode, contenttype)
+        if statuscode == 200 and contenttype == "text/html":
+            # Read max 10000 bytes
+            partialhtml = i.read(10000)
+            try:
+                # This might raise an exception if the HTML is _really_ broken
+                tree = lxml.html.fromstring(partialhtml)
+                title = tree.find(".//title")
+                if title is not None and title.text is not None:
+                    reply += "[%s]" % title.text
+                # DEBUG
+                if title is None:
+                    reply += "<title is none>"
+                elif title.text is None:
+                    reply += "<title.text is none>"
+                # END
+            except:
+                reply += "<exception>"
+                pass
+        self.bot.msgReply(nick, channel, reply)
 
     def set_log_entry(self, nick, entry):
         entry = " ".join(entry)
