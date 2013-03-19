@@ -189,7 +189,8 @@ class IRCActions():
         url = urlmatch.group()
         try:
             i = urllib2.urlopen(url, timeout=3)
-        except:
+        except Exception as e:
+			log(e)
             self.bot.msgReply(nick, channel, reply + "Timeout")
             return
         statuscode = i.getcode()
@@ -203,7 +204,7 @@ class IRCActions():
                 tree = lxml.html.fromstring(partialhtml)
                 title = tree.find(".//title")
                 if title is not None and title.text is not None:
-                    reply += "[%s]" % title.text
+                    reply += "[%s]" % title.text.strip()
                 # DEBUG
                 if title is None:
                     reply += "<title is none>"
