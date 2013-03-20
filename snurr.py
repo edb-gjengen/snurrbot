@@ -204,7 +204,7 @@ class IRCActions():
                 tree = lxml.html.fromstring(partialhtml)
                 title = tree.find(".//title")
                 if title is not None and title.text is not None:
-                    reply += "[%s]" % title.text.strip()
+                    reply += "[%s]" % re.sub(r'\s+', ' ', title.text.strip())
                 # DEBUG
                 if title is None:
                     reply += "<title is none>"
