@@ -190,7 +190,7 @@ class IRCActions():
         try:
             i = urllib2.urlopen(url, timeout=3)
         except Exception as e:
-			log(e)
+            _log(e)
             self.bot.msgReply(nick, channel, reply + "Timeout")
             return
         statuscode = i.getcode()
