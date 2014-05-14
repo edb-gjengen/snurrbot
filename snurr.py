@@ -188,7 +188,8 @@ class IRCActions():
         reply = "URL: "
         url = urlmatch.group()
         try:
-            i = urllib2.urlopen(url, timeout=3, headers={'User-Agent': 'snurrbot v0.1'})
+            req = urllib2.Request(url, headers={'User-Agent': 'snurrbot v0.1'})
+            i = urllib2.urlopen(req)
         except Exception as e:
             _log(e)
             self.bot.msgReply(nick, channel, reply + "Timeout")
