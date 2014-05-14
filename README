@@ -1,5 +1,5 @@
 Requirements:
- - python-twisted
+ - python-twisted python-mysqldb python-lxml python-openssl
 
 $ python snurr.py -h
 Usage: python snurr.py [options] CHANNEL

@@ -188,7 +188,7 @@ class IRCActions():
         reply = "URL: "
         url = urlmatch.group()
         try:
-            i = urllib2.urlopen(url, timeout=3)
+            i = urllib2.urlopen(url, timeout=3, headers={'User-Agent': 'snurrbot v0.1'})
         except Exception as e:
             _log(e)
             self.bot.msgReply(nick, channel, reply + "Timeout")
@@ -276,11 +276,11 @@ def _setup_and_parse_options():
     parser = optparse.OptionParser(description='Pipes UDP-messages to an IRC-channel.',
                                    usage=_usage())
     parser.add_option('-c', '--connect', metavar='SERVER',
-                      help='IRC server (default: irc.ifi.uio.no)', default='irc.ifi.uio.no')
+                      help='IRC server (default: irc.ifi.uio.no)', default='irc.oftc.net')
     parser.add_option('-p', '--port', metavar='PORT', type=int,
-                      help='IRC server port (default: 6667)', default=6667)
+                      help='IRC server port (default: 6697)', default=6697)
     parser.add_option('-s','--ssl', action='store_true',
-                      help='connect with SSL (default: False)', default=False)
+                      help='connect with SSL (default: False)', default=True)
     parser.add_option('-l', '--listen_port', metavar='LISTEN_PORT', type=int,
                       help='UDP listen port (default: 55666)', default=55666)
     return parser.parse_args()
