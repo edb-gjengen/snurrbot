@@ -104,6 +104,7 @@ class IRCActions():
         self.bot = bot
         if not settings.DISABLE_LOG:
             self.dbpool = self._get_dbpool()
+        if not settings.DISABLE_TETRIS:
             self.tetris_dbpool = self._get_tetris_dbpool()
 
     def _get_dbpool(self):
