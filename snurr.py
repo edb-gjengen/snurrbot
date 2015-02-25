@@ -147,6 +147,9 @@ class IRCActions():
             text += "   Add new entry in log\n"
             text += "Command: !lastlog\n"
             text += "   Last 3 log entries\n"
+        if not settings.DISABLE_TETRIS:
+            text += "Command: !tetrishigh\n"
+            text += "   Display tetris highscore\n"
         text += "Command: !ping HOST\n"
         text += "   Ping target host"
         return text
