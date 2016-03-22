@@ -1,12 +1,12 @@
 # Requirements:
 With virtualenv:
-    apt-get install libxml2-dev libxslt1-dev python-dev libmysqlclient-dev
+    apt install libxml2-dev libxslt1-dev python-dev libmysqlclient-dev
     virtualenv venv
     . venv/bin/activate
     pip install -r requirements.txt
 
 Without venv:
-    python-twisted python-mysqldb python-lxml python-openssl
+    python-twisted python-mysqldb python-lxml python-openssl python-requests
 
 $ python snurr.py -h
 Usage: python snurr.py [options] CHANNEL
