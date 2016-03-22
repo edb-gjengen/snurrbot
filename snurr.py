@@ -174,8 +174,8 @@ class IRCActions:
             content_type = content_type.split(';')[0]
         reply += "%d %s " % (req.status_code, content_type)
         if req.status_code == 200 and content_type == "text/html":
-            # Read max 10240 bytes
-            partial_html = next(req.iter_content(chunk_size=10240))
+            # Read max 20480 bytes
+            partial_html = next(req.iter_content(chunk_size=20480))
             reply += parse_title(partial_html)
 
         self.bot.msgReply(nick, channel, reply)
