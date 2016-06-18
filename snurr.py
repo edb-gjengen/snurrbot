@@ -160,7 +160,7 @@ class IRCActions:
 
     def msg_urlinfo(self, url, channel, nick):
         reply = get_reply_from_url(url)
-        self.bot.msgReply(nick, channel, reply)
+        self.bot.msgReply(nick, channel, reply.encode("utf-8"))
 
     def get_tetris_highscore(self):
         sql = "SELECT MAX(score) AS highscore, name FROM highscore GROUP BY name ORDER BY highscore DESC LIMIT 3"
