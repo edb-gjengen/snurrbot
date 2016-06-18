@@ -1,7 +1,7 @@
+from __future__ import unicode_literals
 import unittest
 
-import requests
-from utils import parse_title
+from utils import parse_title, get_reply_from_url
 
 
 class ParseHTMLTest(unittest.TestCase):
@@ -12,14 +12,12 @@ class ParseHTMLTest(unittest.TestCase):
             <title>{}</title>
             <meta charset="utf-8" />
             <meta name="idk" content="test" />""".format(title)
-        self.assertEqual(parse_title(partial_html=partial_html), '[{}]'.format(title))
+        self.assertEqual(parse_title(html=partial_html), title)
 
-    # @unittest.skip()
-    def test_parse_title_from_stream(self):
-        url = 'http://lol.com'
-        req = requests.get(url, headers={'User-Agent': 'snurrbot v0.1'}, stream=True)
-        partial_html = req.iter_content(chunk_size=10240)
-        self.assertEqual(parse_title(partial_html=partial_html), None)
+    def test_get_reply_from_url(self):
+        url = 'https://www.youtube.com/watch?v=3yR_BAqB7aQ'
+        reply = get_reply_from_url(url)
+        self.assertEqual(reply, 'URL: 200 text/html [Daydream Labs: Puzzle - YouTube]')
 
 if __name__ == '__main__':
     unittest.main()

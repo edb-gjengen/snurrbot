@@ -1,8 +1,12 @@
-import logging
-import re
-import subprocess
+from __future__ import unicode_literals
 
+import logging
 import lxml.html
+from lxml.etree import XMLSyntaxError
+import micawber
+import re
+import requests
+import subprocess
 from twisted.enterprise import adbapi
 
 
@@ -53,22 +57,55 @@ def ping_host(host):
         return "feil med ping:" + str(e)
 
 
-def parse_title(partial_html):
-    reply = ''
+def get_title_with_oembed(url):
+    providers = micawber.bootstrap_basic()
     try:
-        # This might raise an exception if the HTML is _really_ broken
-        tree = lxml.html.fromstring(partial_html)
-        title = tree.find(".//title")
-        if title is not None and title.text is not None:
-            reply += "[%s]" % re.sub(r'\s+', ' ', title.text.strip())
-        # DEBUG
-        if title is None:
-            reply += "<title is none>"
-        elif title.text is None:
-            reply += "<title.text is none>"
-        # END
-    except Exception as e:
-        reply += "<exception>"
-        logger.error(e.message)
+        res = providers.request(url)
+    except micawber.ProviderException as e:
+        logger.info(e)
+        return ''
+
+    return '{} - {}'.format(res.get('title'), res.get('provider_name'))
+
+
+def get_reply_from_url(url):
+    user_agent = 'snurrbot v0.1'
+
+    # Try using oembed
+    title = get_title_with_oembed(url)
+
+    # Fetch the html
+    try:
+        req = requests.get(url, headers={'User-Agent': user_agent})
+    except requests.Timeout as e:
+        logger.info(e)
+        return 'URL Timeout'
+
+    content_type = req.headers['content-type']
+    if ';' in content_type:
+        content_type = content_type.split(';')[0]
+
+    if not title and req.status_code == 200 and content_type == "text/html":
+        title = parse_title(req.text)
+
+    title = '' if not title else ' [{}]'.format(title)
+    reply = "URL: {} {}{}".format(req.status_code, content_type, title)
 
     return reply
+
+
+def parse_title(html):
+    title = ''
+
+    try:
+        # This might raise an exception if the HTML is _really_ broken
+        tree = lxml.html.fromstring(html)
+        title_tag = tree.find(".//title")
+
+        if title_tag is not None and title_tag.text is not None:
+            title += "%s" % re.sub(r'\s+', ' ', title_tag.text.strip())
+
+    except XMLSyntaxError as e:
+        logger.info(str(e))
+
+    return title

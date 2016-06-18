@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
 import optparse
-import requests
 import re
 import logging
 from twisted.words.protocols import irc
@@ -9,7 +8,7 @@ from twisted.internet import protocol, reactor, ssl
 
 import settings
 
-from utils import ReconnectingConnectionPool, ping_host, parse_title
+from utils import ReconnectingConnectionPool, ping_host, get_reply_from_url
 
 logger = logging.getLogger('snurr')
 
@@ -157,27 +156,10 @@ class IRCActions:
         # Check if msg contains HTTP(S) URL
         urlmatch = re.search(r"(https?):\/\/([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w\.-]*\/?)(\?[\/\w=&\.-]+)?", msg, re.I)
         if urlmatch is not None:
-            self.msg_urlinfo(urlmatch, channel, nick)
+            self.msg_urlinfo(urlmatch.group(), channel, nick)
 
-    def msg_urlinfo(self, urlmatch, channel, nick):
-        reply = "URL: "
-        url = urlmatch.group()
-        try:
-            req = requests.get(url, headers={'User-Agent': 'snurrbot v0.1'}, stream=True)
-        except Exception as e:
-            logger.info(e)
-            self.bot.msgReply(nick, channel, reply + "Timeout")
-            return
-
-        content_type = req.headers['content-type']
-        if ';' in content_type:
-            content_type = content_type.split(';')[0]
-        reply += "%d %s " % (req.status_code, content_type)
-        if req.status_code == 200 and content_type == "text/html":
-            # Read max 20480 bytes
-            partial_html = next(req.iter_content(chunk_size=20480))
-            reply += parse_title(partial_html)
-
+    def msg_urlinfo(self, url, channel, nick):
+        reply = get_reply_from_url(url)
         self.bot.msgReply(nick, channel, reply)
 
     def get_tetris_highscore(self):
