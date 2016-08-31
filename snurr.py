@@ -41,7 +41,7 @@ class SnurrBot(irc.IRCClient):
         else:
             self.actions.newfull(msg, user, channel)
         logger.info("PRIVMSG: %s: %s" % (user,msg))
-    
+
     def msgReply(self, user, to, msg):
         if len(msg) > 0:
             if to == self.nickname:
@@ -55,7 +55,7 @@ class SnurrBot(irc.IRCClient):
         logger.info("Message sent to %s" % self.factory.channel)
 
         if len(msg) > 0:
-            self.say(self.factory.channel, msg, length=512)
+            self.say(self.factory.channel, msg.encode('utf-8'), length=512)
 
     def rawDataReceived(self, data):
         pass
