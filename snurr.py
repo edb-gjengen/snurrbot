@@ -73,7 +73,7 @@ class SnurrBotFactory(protocol.ClientFactory):
 
     def buildProtocol(self, addr):
         self.timeout = self.TIMEOUT_INITIAL  # reset
-        super().buildProtocol(addr)
+        return super().buildProtocol(addr)
 
     def clientConnectionLost(self, connector, reason):
         self.timeout *= self.timeout
