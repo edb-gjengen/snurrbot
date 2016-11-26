@@ -3,6 +3,8 @@
 import optparse
 import re
 import logging
+from time import sleep
+
 from twisted.words.protocols import irc
 from twisted.internet import protocol, reactor, ssl
 
@@ -14,20 +16,16 @@ logger = logging.getLogger('snurr')
 
 
 class SnurrBot(irc.IRCClient):
+    nickname = 'snurr'
+
     def __init__(self):
         self.actions = IRCActions(self)
-
-    @property
-    def nickname(self):
-        return self.factory.nickname
-
-    def __unicode__(self):
-        return "SnurrBot:%s" % self.nickname
 
     def signedOn(self):
         self.join(self.factory.channel)
         logger.info("Signed on as %s." % (self.nickname,))
-        # make the client instance known to the factory
+
+        # Make the client instance known to the factory
         self.factory.bot = self
 
     def joined(self, channel):
@@ -40,22 +38,22 @@ class SnurrBot(irc.IRCClient):
             self.actions.new(msg[1:], user, channel)
         else:
             self.actions.newfull(msg, user, channel)
-        logger.info("PRIVMSG: %s: %s" % (user,msg))
+        logger.info("PRIVMSG: %s: %s", user, msg)
 
-    def msgReply(self, user, to, msg):
+    def msg_reply(self, user, to, msg):
         if len(msg) > 0:
             if to == self.nickname:
-                logger.info("Message sent to %s" % user)
+                logger.info("Message sent to %s", user)
                 self.msg(user, msg, length=512)
             else:
-                self.msgToChannel(msg)
+                self.msg_to_channel(msg)
 
-    def msgToChannel(self, msg):
+    def msg_to_channel(self, msg):
         # Sends a message to the predefined channel
-        logger.info("Message sent to %s" % self.factory.channel)
+        logger.info("Message sent to %s", self.factory.channel)
 
         if len(msg) > 0:
-            self.say(self.factory.channel, msg.encode('utf-8'), length=512)
+            self.say(self.factory.channel, msg, length=512)
 
     def rawDataReceived(self, data):
         pass
@@ -67,25 +65,33 @@ class SnurrBot(irc.IRCClient):
 class SnurrBotFactory(protocol.ClientFactory):
     protocol = SnurrBot
 
-    def __init__(self, channel, nickname='snurr'):
-        self.channel = channel
-        self.nickname = nickname
+    TIMEOUT_INITIAL = 2
 
-    def __unicode__(self):
-        return "SnurrBotFactory"
+    def __init__(self, channel):
+        self.channel = channel
+        self.timeout = self.TIMEOUT_INITIAL
+
+    def buildProtocol(self, addr):
+        self.timeout = self.TIMEOUT_INITIAL  # reset
+        super().buildProtocol(addr)
 
     def clientConnectionLost(self, connector, reason):
-        logger.info("Lost connection (%s), reconnecting." % reason)
+        self.timeout *= self.timeout
+        logger.info("Lost connection (%s), reconnecting.", reason)
+        sleep(self.timeout)
         connector.connect()
 
     def clientConnectionFailed(self, connector, reason):
-        logger.info("Could not connect: (%s), retrying." % reason)
+        self.timeout *= self.timeout
+        logger.info("Could not connect: (%s), retrying in %s seconds.", reason)
+        sleep(self.timeout)
+        connector.connect()
 
 
 class UDPListener(protocol.DatagramProtocol):
 
     def __init__(self, botfactory):
-        self.botfactory = botfactory
+        self.bot_factory = botfactory
 
     def startProtocol(self):
         logger.info("Listening for messages.")
@@ -97,10 +103,10 @@ class UDPListener(protocol.DatagramProtocol):
         host, port = addr
         # UDP messages (from MediaWiki f.ex) arrive here and are relayed
         # to the ircbot created by the bot factory.
-        logger.info("Received %r from %s:%d" % (data, host, port))
-        logger.info("Relaying msg to IRCClient in %s" % (self.botfactory,))
-        if self.botfactory.bot:
-            self.botfactory.bot.msgToChannel(data)
+        logger.info("Received %r from %s:%d", data, host, port)
+        logger.info("Relaying msg to IRCClient in %s", self.bot_factory)
+        if self.bot_factory.bot:
+            self.bot_factory.bot.msg_to_channel(data)
 
 
 class IRCActions:
@@ -113,8 +119,10 @@ class IRCActions:
         # Setup an async db connection
         return ReconnectingConnectionPool(
             settings.DB_API_ADAPTER,
-            host=settings.TETRIS_DB_HOST, user=settings.TETRIS_DB_USER,
-            passwd=settings.TETRIS_DB_PASSWORD, db=settings.TETRIS_DB_NAME,
+            host=settings.TETRIS_DB_HOST,
+            user=settings.TETRIS_DB_USER,
+            passwd=settings.TETRIS_DB_PASSWORD,
+            db=settings.TETRIS_DB_NAME,
             charset="utf8", use_unicode=True,
             cp_reconnect=True)
 
@@ -138,17 +146,17 @@ class IRCActions:
         # Process the commands
         parts = msg.split()
         if not parts:
-            self.bot.msgReply(nick, channel, help_reply)
+            self.bot.msg_reply(nick, channel, help_reply)
             return
 
         if parts[0] == "ping" and len(parts) == 2:
-            self.bot.msgReply(nick, channel, ping_host(parts[1]))
+            self.bot.msg_reply(nick, channel, ping_host(parts[1]))
         elif parts[0] == "help" and len(parts) == 1:
-            self.bot.msgReply(nick, channel, self.help())
+            self.bot.msg_reply(nick, channel, self.help())
         elif parts[0] == "tetrishigh" and len(parts) == 1 and not settings.DISABLE_TETRIS:
             self.get_tetris_highscore().addCallback(self.msg_tetris_highscore, channel, nick)
         else:
-            self.bot.msgReply(nick, channel, help_reply)
+            self.bot.msg_reply(nick, channel, help_reply)
 
     def newfull(self, msg, user, channel):
         nick = user.split('!', 1)[0]  # Strip out hostmask
@@ -160,7 +168,7 @@ class IRCActions:
 
     def msg_urlinfo(self, url, channel, nick):
         reply = get_reply_from_url(url)
-        self.bot.msgReply(nick, channel, reply.encode("utf-8"))
+        self.bot.msg_reply(nick, channel, reply)
 
     def get_tetris_highscore(self):
         sql = "SELECT MAX(score) AS highscore, name FROM highscore GROUP BY name ORDER BY highscore DESC LIMIT 3"
@@ -170,7 +178,7 @@ class IRCActions:
         for highscore in highscores:
             high, name = highscore
             string_highscore = "Highscore: " + str(high) + " by " + name + "."
-            self.bot.msgReply(nick, channel, string_highscore.encode("utf-8"))
+            self.bot.msg_reply(nick, channel, string_highscore)
 
 
 def _get_parser():
@@ -188,12 +196,16 @@ def _get_parser():
     return parser
 
 
-if __name__ == "__main__":
-    LOG_FORMAT = '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
+def setup_logging():
+    log_format = '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s'
     logger.setLevel(logging.DEBUG)
-    consoleLogger = logging.StreamHandler()
-    consoleLogger.setFormatter(logging.Formatter(LOG_FORMAT))
-    logger.addHandler(consoleLogger)
+    console_logger = logging.StreamHandler()
+    console_logger.setFormatter(logging.Formatter(log_format))
+    logger.addHandler(console_logger)
+
+
+if __name__ == "__main__":
+    setup_logging()
 
     argument_parser = _get_parser()
     options, args = argument_parser.parse_args()
@@ -201,10 +213,11 @@ if __name__ == "__main__":
     if len(args) != 1:
         print(argument_parser.usage)
         exit(1)
-    channel = args[0] if args[0][0] == '#' else '#' + args[0]
+
+    _channel = args[0] if args[0][0] == '#' else '#' + args[0]
 
     # Start IRC-bot on specified server and port.
-    my_snurrbot = SnurrBotFactory(channel)
+    my_snurrbot = SnurrBotFactory(_channel)
     if options.ssl:
         reactor.connectSSL(options.connect, options.port, my_snurrbot, ssl.ClientContextFactory())
     else:

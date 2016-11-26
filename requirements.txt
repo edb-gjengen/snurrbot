@@ -1,6 +1,5 @@
-Twisted[tls]==16.2.0
+Twisted[tls]==16.6.0
 lxml==3.6.0
 micawber==0.3.3
 mysqlclient==1.3.7
 requests==2.10.0
-ndg-httpsclient==0.4.0
